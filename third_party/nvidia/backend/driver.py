@@ -245,11 +245,32 @@ static void _launch(int gridX, int gridY, int gridZ, int num_warps, int num_ctas
   void *params[] = {{ {', '.join(params)} }};
   if (gridX*gridY*gridZ > 0) {{
     if ((num_ctas == 1) && (0 == launch_cooperative_grid)) {{
-      CUDA_CHECK(cuLaunchKernel(function, gridX, gridY, gridZ, 32*num_warps, 1, 1, shared_memory, stream, params, 0));
-    }} else if ((num_ctas == 1) && (0 != launch_cooperative_grid)) {{
+      CUlaunchConfig config;
       CUlaunchAttribute launchAttr[1];
+      CUlaunchAttribute pdlAttr = {{ .id = CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION, .value = 1}};
+      launchAttr[0] = pdlAttr;
+      config.gridDimX = gridX;
+      config.gridDimY = gridY;
+      config.gridDimZ = gridZ;
+      config.blockDimX = 32 * num_warps;
+      config.blockDimY = 1;
+      config.blockDimZ = 1;
+      config.sharedMemBytes = shared_memory;
+      config.hStream = stream;
+      config.attrs = launchAttr;
+      config.numAttrs = 1;
+      static cuLaunchKernelEx_t cuLaunchKernelExHandle = NULL;
+      if (cuLaunchKernelExHandle == NULL) {{
+        cuLaunchKernelExHandle = getLaunchKernelExHandle();
+      }}
+      CUDA_CHECK(cuLaunchKernelExHandle(&config, function, params, 0));
+    }} else if ((num_ctas == 1) && (0 != launch_cooperative_grid)) {{
+      CUlaunchAttribute launchAttr[2];
       CUlaunchAttribute coopAttr = {{ .id = CU_LAUNCH_ATTRIBUTE_COOPERATIVE, .value = 1}};
       launchAttr[0] = coopAttr;
+      CUlaunchAttribute pdlAttr = {{ .id = CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION, .value = 1}};
+      launchAttr[1] = pdlAttr;
+
 
       CUlaunchConfig config;
       config.gridDimX = gridX;
@@ -261,7 +282,7 @@ static void _launch(int gridX, int gridY, int gridZ, int num_warps, int num_ctas
       config.sharedMemBytes = shared_memory;
       config.hStream = stream;
       config.attrs = launchAttr;
-      config.numAttrs = 1;
+      config.numAttrs = 2;
 
       static cuLaunchKernelEx_t cuLaunchKernelExHandle = NULL;
       if (cuLaunchKernelExHandle == NULL) {{
@@ -270,20 +291,26 @@ static void _launch(int gridX, int gridY, int gridZ, int num_warps, int num_ctas
       CUDA_CHECK(cuLaunchKernelExHandle(&config, function, params, 0));
 
     }} else {{
-      CUlaunchAttribute launchAttr[3];
+      CUlaunchAttribute launchAttr[4];
       launchAttr[0].id = CU_LAUNCH_ATTRIBUTE_CLUSTER_DIMENSION;
       launchAttr[0].value.clusterDim.x = clusterDimX;
       launchAttr[0].value.clusterDim.y = clusterDimY;
       launchAttr[0].value.clusterDim.z = clusterDimZ;
       launchAttr[1].id = CU_LAUNCH_ATTRIBUTE_CLUSTER_SCHEDULING_POLICY_PREFERENCE;
       launchAttr[1].value.clusterSchedulingPolicyPreference = CU_CLUSTER_SCHEDULING_POLICY_SPREAD;
+      
 
-      unsigned numAttrs = 2;
+      CUlaunchAttribute pdlAttr = {{ .id = CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION, .value = 1}};
+      launchAttr[2] = pdlAttr;
+
+      unsigned numAttrs = 3;
       if (0 != launch_cooperative_grid) {{
         CUlaunchAttribute coopAttr = {{ .id = CU_LAUNCH_ATTRIBUTE_COOPERATIVE, .value = 1}};
-        launchAttr[2] = coopAttr;
-        numAttrs = 3;
+        launchAttr[3] = coopAttr;
+        numAttrs = 4;
       }}
+
+
 
       CUlaunchConfig config;
       config.gridDimX = gridX * clusterDimX;

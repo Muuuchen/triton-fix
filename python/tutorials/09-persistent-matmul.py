@@ -29,6 +29,7 @@ import triton.profiler as proton
 from contextlib import contextmanager
 
 from typing import Optional
+torch.cuda.set_device(2)
 
 if torch.cuda.is_available():
     from triton._C.libtriton import nvidia
