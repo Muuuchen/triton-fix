@@ -195,6 +195,10 @@ def make_launcher(constants, signature):
     ]
     params = [f"&arg{i}" for i, ty in signature.items() if ty != "constexpr"]
     params.append("&global_scratch")
+    if 'PDL_FLAG' in os.environ:
+      pdl_flag = int(os.environ['PDL_FLAG'])
+    else:
+      pdl_flag = 0
     src = f"""
 #include \"cuda.h\"
 #include <stdbool.h>
@@ -247,7 +251,7 @@ static void _launch(int gridX, int gridY, int gridZ, int num_warps, int num_ctas
     if ((num_ctas == 1) && (0 == launch_cooperative_grid)) {{
       CUlaunchConfig config;
       CUlaunchAttribute launchAttr[1];
-      CUlaunchAttribute pdlAttr = {{ .id = CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION, .value = 1}};
+      CUlaunchAttribute pdlAttr = {{ .id = CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION, .value = {pdl_flag}}};
       launchAttr[0] = pdlAttr;
       config.gridDimX = gridX;
       config.gridDimY = gridY;
